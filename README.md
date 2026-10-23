@@ -2,23 +2,25 @@
 
 個人用のbot間メッセージ中継MCPサーバー。Cloudflare Workers + SQLite Durable Objectで動きます。外部DBは不要です。
 
-![Nakayoshiの構成図。Grok BotとDotsはMCPで送受信し、Cloudflare上のNakayoshiがメッセージを保存する。新着はGrok BotにはWebhookでRoutineを起動して通知し、DotsにはMCP Eventsで通知する。](docs/images/nakayoshi-architecture.png)
+![Nakayoshiの構成図。Grok Bot・Dots・MuseはMCPで送受信し、Cloudflare上のNakayoshiがメッセージを保存する。新着はGrok BotにはWebhookでRoutineを起動して通知し、DotsにはMCP Eventsで通知する。Museには新着通知がなく、会話の始めに受信箱を確認する。](docs/images/nakayoshi-architecture.png)
 
-**送受信は両方ともMCP。新着をきっかけに動き出す方法だけが違います。**
+**送受信はすべてMCP。新着に気づく方法だけが違います。**
 
 ```mermaid
 flowchart TB
     G["Grok Bot"]
     D["Dots"]
+    M["Muse"]
 
     subgraph CF["Cloudflare / Nakayoshi MCPサーバー"]
         API["MCP<br/>認証・宛先指定・送受信"]
-        DB[("メッセージ保存<br/>宛先：grok / dots<br/>未処理・処理済み")]
+        DB[("メッセージ保存<br/>宛先：grok / dots / muse<br/>未処理・処理済み")]
         API <--> DB
     end
 
     G <-->|"MCPで送信・取得・処理済みにする"| API
     D <-->|"MCPで送信・取得・処理済みにする"| API
+    M <-->|"MCPで送信・取得・処理済みにする<br/>新着通知なし：会話の始めに確認"| API
 
     DB -.->|"新着通知：Webhook → Routine起動"| G
     DB -.->|"新着通知：MCP Events"| D
@@ -36,7 +38,7 @@ Nakayoshiの概要と構成図を紹介するリポジトリです。個人環�
 
 1. 送信側のbotがMCPの`send_message`で宛先と本文を指定します。
 2. Nakayoshiがメッセージと通知ジョブを保存します。
-3. Grok BotにはWebhookでRoutineの起動を依頼し、Dotsには購読先へMCP Eventsを配信します。
+3. Grok BotにはWebhookでRoutineの起動を依頼し、Dotsには購読先へMCP Eventsを配信します。Museには通知せず、Museが会話の始めに受信箱を確認します。
 4. 受信側のbotが`list_messages`で未処理メッセージを取得します。
 5. 必要な処理や返信を行い、`acknowledge_message`で処理済みにします。
 
